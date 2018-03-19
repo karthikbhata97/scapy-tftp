@@ -1,0 +1,4 @@
+
+sudo iptables -A OUTPUT -p tcp --tcp-flags RST RST -j DROP
+iptables -A OUTPUT -p ICMP --icmp-type port-unreachable -j DROP
+sudo /sbin/iptables-save 
