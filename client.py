@@ -1,6 +1,7 @@
 from scapy.all import *
 from threading import Thread
 import sys
+import os.path
 
 class TFTPReader:
 	def __init__(self, dst, sport, filename):
@@ -26,7 +27,7 @@ class TFTPReader:
 	def save_data(self, pkt):
 		pkt[UDP].dport = 69
 		pkt = pkt.__class__(str(pkt))
-		if TFTP_DATA in pkt and pkt[TFTP_DATA].block == self.block:
+		if TFTP_DATA in pkt and pkt[TFTP_DATA].block == self.block and Raw in pkt:
 			with open(self.filename, "a") as f:
 				f.write(pkt[Raw].load)
 			ack = self.basic_pkt
@@ -34,6 +35,8 @@ class TFTPReader:
 			ack_pkt = ack/TFTP(op=04)/TFTP_ACK(block=self.block)
 			send(ack_pkt, verbose=self.verbose)
 			self.block += 1
+		else:
+			print "No such file"
 
 	def listen(self):
 		sniff(prn=self.save_data, lfilter=self.sniff_filter,  stop_filter=self.finish)
@@ -91,8 +94,8 @@ class TFTPClient:
 		self.verbose = False
 
 	def interactive(self):
-		inp = None
-		while True:
+		inp = ""
+		while "exit" not in inp:
 			sys.stdout.write(">> ")
 			inp = raw_input().split(' ')
 			if len(inp) == 1:
@@ -109,10 +112,15 @@ class TFTPClient:
 			send(RRQ, verbose=self.verbose)
 			read_thread.join()						
 		elif command == 'put':
+			if not os.path.isfile(filename):
+				print "No such file"
+				return
 			WRQ = self.basic_pkt/TFTP(op=02)/TFTP_RRQ(filename=filename, mode=self.mode)
 			reply = None
 			while not reply:
 				reply = sr1(WRQ, timeout=2, verbose=self.verbose)
+			reply[UDP].dport = 69
+			reply = reply.__class__(str(reply))
 			dport = reply[UDP].sport
 			write_obj = TFTPWriter(self.dst, self.sport, dport, filename)
 			write_thread = Thread(target=write_obj.listen)
