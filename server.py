@@ -2,6 +2,7 @@ from scapy.all import *
 from threading import Thread
 import sys
 import os.path
+import argparse
 
 class TFTPReader:
 	def __init__(self, src, dst, sport, dport, filename, mode):
@@ -135,7 +136,7 @@ class TFTPServer:
 
 
 	def sniff_filter(self, pkt):
-		if pkt.haslayer(UDP) and pkt[UDP].dport == self.sport:
+		if pkt.haslayer(IP) and pkt.haslayer(UDP) and pkt[UDP].dport == self.sport:
 			return True
 		return False
 
@@ -144,7 +145,15 @@ class TFTPServer:
 
 
 
-tftp = TFTPServer(int(sys.argv[1]))
-tftp.listen()
-# tftp.run_command('get', 'idk')
-# tftp.run_command('put', 'idk.pcap')
+if __name__ == '__main__':
+	parser = argparse.ArgumentParser()
+	parser.add_argument('-6', '--ipv6', help='Run tftp server on IPv6 mode', action='store_true')
+	parser.add_argument('-p', '--port', nargs=1, help='Run tftp server given port. default: 69', type=int, default=69)
+	args = parser.parse_args()
+	if args.ipv6:
+		IP = IPv6
+	if args.port:
+		port = args.port[0]
+	tftp = TFTPServer(port)
+	tftp.listen()
+
