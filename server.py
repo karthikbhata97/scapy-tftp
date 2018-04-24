@@ -1,8 +1,12 @@
+import logging
+logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
+
 from scapy.all import *
 from threading import Thread
 import sys
 import os.path
 import argparse
+
 
 class TFTPReader:
 	def __init__(self, src, dst, sport, dport, filename, mode):
