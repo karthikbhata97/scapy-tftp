@@ -27,4 +27,3 @@ Help:
 python2.7 client.py -h
 ```
 
-Use ```get``` and ```put``` to share  files between client and server.
