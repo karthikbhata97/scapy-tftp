@@ -7,8 +7,9 @@ import sys
 import os.path
 import argparse
 
-
+# Store file sent from the client
 class TFTPReader:
+	# Initialize fields
 	def __init__(self, src, dst, sport, dport, filename, mode):
 		self.src = src
 		self.dst = dst
@@ -22,15 +23,18 @@ class TFTPReader:
 		with open(self.filename, "w") as f:
 			f.write("")
 
+	# End of transmission of file
 	def finish(self, pkt):
 		# since scapy not recognizes recvd tftp, consider op, block (4 bytes) into raw load
 		if Raw in pkt and len(pkt[Raw].load) != 516:
 			return True
 		return False
 
+	# Filter on packets to be recieved
 	def sniff_filter(self, pkt):
 		return pkt.haslayer(IP) and pkt.haslayer(UDP) and pkt[UDP].dport == self.sport
 
+	# Store data into a file
 	def save_data(self, pkt):
 		pkt[UDP].dport = 69
 		pkt = pkt.__class__(str(pkt))
@@ -45,11 +49,14 @@ class TFTPReader:
 		else:
 			print "No such file"
 
+	# Sniff packets
 	def listen(self):
 		sniff(prn=self.save_data, lfilter=self.sniff_filter,  stop_filter=self.finish)
 
 
+# Send file to the client
 class TFTPWriter:
+	# Initialize fields
 	def __init__(self, src, dst, sport, dport, filename, mode):
 		self.src = src
 		self.dst = dst
@@ -64,14 +71,17 @@ class TFTPWriter:
 			data = f.read()
 			self.data_list = [data[i:i+512] for i in range(0, len(data), 512)]
 
+	# End of file transmission
 	def finish(self, pkt):
 		if self.block == len(self.data_list) + 1:
 			return True
 		return False
 
+	# Filter on packets to be recieved
 	def sniff_filter(self, pkt):
 		return pkt.haslayer(IP) and pkt.haslayer(UDP) and pkt[UDP].dport == self.sport
 
+	# Send data to client
 	def send_data(self):
 		data_pkt = self.basic_pkt
 		data_pkt[UDP].dport = self.dport
@@ -82,22 +92,26 @@ class TFTPWriter:
 			while self.block == i:
 				pass
 
+	# Recieve ack and increment the block successfully sent
 	def recv_ack(self, pkt):
 		pkt[UDP].dport = 69 # trick for scapy tp detect as TFTP
 		pkt = pkt.__class__(str(pkt))
 		if TFTP_ACK in pkt and pkt[TFTP_ACK].block == self.block:
 			self.block += 1
 
+	# Sniff packets
 	def listen(self):
 		sniff(prn=self.recv_ack, lfilter=self.sniff_filter,  stop_filter=self.finish)
 
 
-
+# Main server class
 class TFTPServer:
+	# Initialize the fields
 	def __init__(self, sport):
 		self.sport = sport
 		self.verbose = False
 
+	# Upon RRQ, it will create a thread for TFTPWriter
 	def read_handler(self, pkt, pdu):
 		sp = random.randint(1024, 65535)
 		dp = pkt[UDP].sport
@@ -111,6 +125,7 @@ class TFTPServer:
 		writer_obj.send_data()
 		write_thread.join()
 
+	# Upon WRQ it will create a thread for TFTPReader
 	def write_handler(self, pkt, pdu):
 		sp = random.randint(1024, 65535)
 		dp = pkt[UDP].sport
@@ -125,6 +140,7 @@ class TFTPServer:
 		send(ack, verbose=self.verbose)
 		read_thread.join()	
 
+	# Parse recieved packet for command type
 	def action(self, pkt):
 		if self.sport == 69: #scapy default
 			pdu = pkt[TFTP]
@@ -139,11 +155,13 @@ class TFTPServer:
 			pass
 
 
+	# Filter on packets to be recieved
 	def sniff_filter(self, pkt):
 		if pkt.haslayer(IP) and pkt.haslayer(UDP) and pkt[UDP].dport == self.sport:
 			return True
 		return False
 
+	# Sniff packets
 	def listen(self):
 		sniff(prn=self.action, lfilter=self.sniff_filter)
 
