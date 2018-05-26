@@ -6,15 +6,17 @@ from threading import Thread
 import sys
 import os.path
 import argparse
+import netifaces as ni
 
 # For a get request, TFTPReader class will listen and store the file
 class TFTPReader:
 	# Initializing fields
-	def __init__(self, dst, sport, dport, filename):
+	def __init__(self, src, dst, sport, dport, filename):
+		self.src = src
 		self.dst = dst
 		self.dport = dport
 		self.sport = sport
-		self.basic_pkt = IP(dst=self.dst)/UDP(sport=self.sport)
+		self.basic_pkt = IP(src=self.src, dst=self.dst)/UDP(sport=self.sport)
 		self.block = 1
 		self.filename = filename
 		self.verbose = False
@@ -30,7 +32,8 @@ class TFTPReader:
 
 	# Filter on the packets to be recieved
 	def sniff_filter(self, pkt):
-		return pkt.haslayer(IP) and pkt.haslayer(UDP) and pkt[UDP].dport == self.sport
+		return pkt.haslayer(IP) and self.src == pkt[IP].dst and self.dst == pkt[IP].src and \
+		pkt.haslayer(UDP) and pkt[UDP].dport == self.sport
 
 	# Save data into file
 	def save_data(self, pkt):
@@ -44,6 +47,8 @@ class TFTPReader:
 			ack_pkt = ack/TFTP(op=04)/TFTP_ACK(block=self.block)
 			send(ack_pkt, verbose=self.verbose)
 			self.block += 1
+		elif TFTP_DATA in pkt and pkt[TFTP_DATA].block < self.block:
+			pass
 		else:
 			print "No such file"
 
@@ -55,11 +60,12 @@ class TFTPReader:
 # Send file to the server
 class TFTPWriter:
 	# initialize variables
-	def __init__(self, dst, sport, dport, filename):
+	def __init__(self, src, dst, sport, dport, filename):
+		self.src = src
 		self.dst = dst
 		self.dport = dport
 		self.sport = sport
-		self.basic_pkt = IP(dst=self.dst)/UDP(sport=self.sport)
+		self.basic_pkt = IP(src=self.src, dst=self.dst)/UDP(dport=self.dport, sport=self.sport)
 		self.block = 1
 		self.filename = filename
 		self.verbose = False
@@ -75,12 +81,11 @@ class TFTPWriter:
 
 	# Filter on packets to be recieved
 	def sniff_filter(self, pkt):
-		return pkt.haslayer(IP) and pkt.haslayer(UDP) and pkt[UDP].dport == self.sport
+		return pkt.haslayer(IP) and pkt[IP].src == self.src and pkt[IP].dst == self.dst and \
+			pkt.haslayer(UDP) and pkt[UDP].dport == self.sport
 
 	# Send the file block by block
 	def send_data(self):
-		data_pkt = self.basic_pkt
-		data_pkt[UDP].dport = self.dport
 		for i in range(1, len(self.data_list)+1):
 			DATA = data_pkt/TFTP(op=03)/TFTP_DATA(block=i)/Raw(load=self.data_list[i-1])
 			send(DATA, verbose=self.verbose)
@@ -108,12 +113,13 @@ class TFTPWriter:
 # Main client class
 class TFTPClient:
 	# Initialize fields
-	def __init__(self, dst, dport):
+	def __init__(self, src, dst, sport, dport):
 		self.mode = "octet"
+		self.src = src
 		self.dst = dst
 		self.dport = dport
-		self.sport = random.randint(1024, 65535)
-		self.basic_pkt = IP(dst=self.dst)/UDP(sport=self.sport, dport=self.dport)
+		self.sport = sport
+		self.basic_pkt = IP(src=self.src, dst=self.dst)/UDP(sport=self.sport, dport=self.dport)
 		self.verbose = False
 
 	# Interactive shell
@@ -131,7 +137,7 @@ class TFTPClient:
 	def run_command(self, command, filename=None):
 		if command == 'get':
 			RRQ = self.basic_pkt/TFTP(op=01)/TFTP_RRQ(filename=filename, mode=self.mode)
-			read_obj = TFTPReader(self.dst, self.sport, self.dport, filename)
+			read_obj = TFTPReader(self.src, self.dst, self.sport, self.dport, filename)
 			read_thread = Thread(target=read_obj.listen)
 			read_thread.start()
 			send(RRQ, verbose=self.verbose)
@@ -150,7 +156,7 @@ class TFTPClient:
 				print reply[TFTP_ERROR].errormsg
 				sys.exit(0)
 			dport = reply[UDP].sport			
-			write_obj = TFTPWriter(self.dst, self.sport, dport, filename)
+			write_obj = TFTPWriter(self.src, self.dst, self.sport, dport, filename)
 			write_thread = Thread(target=write_obj.listen)
 			write_thread.start()
 			write_obj.send_data()
@@ -165,9 +171,34 @@ if __name__ == '__main__':
 	parser.add_argument('-6', '--ipv6', help='Connect to a IPv6 TFTP server', action='store_true')
 	parser.add_argument('-p', '--port', help='TFTP server port number', default=69, type=int, nargs=1, required=True)
 	parser.add_argument('-i', '--ipaddr', help='TFTP server ip address', type=str, nargs=1, required=True)
+	parser.add_argument('-si', '--source_ip', help='client ip address', nargs=1, type=str, required=False)
+	parser.add_argument('-sp', '--source_port', help='client port', nargs=1, type=int, required=False)
+	parser.add_argument('--iface', help='Interface of which the client should put the packets', nargs=1, type=str, required=False)
 	args = parser.parse_args()
+
 	if args.ipv6:
 		IP = IPv6
-	print args.ipaddr[0], args.port[0]
-	tftp = TFTPClient(args.ipaddr[0], args.port[0])
+
+	if not args.source_ip and not args.iface:
+		print 'Either specify source ip and port or give interface to be used'
+		sys.exit(0)
+
+	if args.source_ip:
+		if not args.source_port:
+			print 'Source port not found'
+			sys.exit(0)
+		source_ip = args.source_ip[0]
+		source_port = args.source_port[0]
+	else:
+		try:
+			source_ip = ni.ifaddresses(args.iface[0])[ni.AF_INET][0]['addr']
+			source_port = random.randint(1024, 65535)
+		except:
+			print 'Invalid interface name', args.iface[0]
+			sys.exit(0)
+
+	dest_ip = args.ipaddr[0]
+	dest_port = args.port[0]
+
+	tftp = TFTPClient(source_ip, dest_ip, source_port, dest_port)
 	tftp.interactive()
