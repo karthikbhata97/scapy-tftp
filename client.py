@@ -47,7 +47,7 @@ class TFTPReader:
 			ack_pkt = ack/TFTP(op=04)/TFTP_ACK(block=self.block)
 			send(ack_pkt, verbose=self.verbose)
 			self.block += 1
-		elif TFTP_DATA in pkt and pkt[TFTP_DATA].block < self.block:
+		elif TFTP_DATA in pkt and pkt[TFTP_DATA].block <= self.block:
 			pass
 		else:
 			print "No such file"
@@ -167,6 +167,37 @@ class TFTPClient:
 
 
 if __name__ == '__main__':
+
+	def manage_multiple(n):
+		ports = []
+		for i in range(n):
+			p = random.randint(1024, 65535)
+			while p in ports:
+				p = random.randint(1024, 65535)
+			ports.append(p)
+		clients = []
+		for i in range(n):
+			c = TFTPClient(source_ip, dest_ip, ports[i], dest_port)
+			clients.append(c)
+
+		while True:
+			sys.stdout.write(">> ")
+			inp = raw_input().split(' ')
+			if inp == 'exit':
+				return
+			if len(inp) == 1:
+				inp.append(None)
+			run_cmd_multiple(clients, n, inp)
+
+	def run_cmd_multiple(clients, n, cmd):
+		threads = []
+		for i in range(n):
+			t = Thread(target=clients[i].run_command, args=(cmd[0], cmd[1],))
+			t.start()
+			threads.append(t)
+		for i in range(n):
+			threads[i].join()	
+
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-6', '--ipv6', help='Connect to a IPv6 TFTP server', action='store_true')
 	parser.add_argument('-p', '--port', help='TFTP server port number', default=69, type=int, nargs=1, required=True)
@@ -174,6 +205,7 @@ if __name__ == '__main__':
 	parser.add_argument('-si', '--source_ip', help='client ip address', nargs=1, type=str, required=False)
 	parser.add_argument('-sp', '--source_port', help='client port', nargs=1, type=int, required=False)
 	parser.add_argument('--iface', help='Interface of which the client should put the packets', nargs=1, type=str, required=False)
+	parser.add_argument('-m', '--multiple', help='Open given number of connections to FTP server', nargs=1, type=int)
 	args = parser.parse_args()
 
 	if args.ipv6:
@@ -200,5 +232,9 @@ if __name__ == '__main__':
 	dest_ip = args.ipaddr[0]
 	dest_port = args.port[0]
 
-	tftp = TFTPClient(source_ip, dest_ip, source_port, dest_port)
-	tftp.interactive()
+	if args.multiple:
+		n = args.multiple[0]
+		manage_multiple(n)
+	else:
+		tftp = TFTPClient(source_ip, dest_ip, source_port, dest_port)
+		tftp.interactive()
