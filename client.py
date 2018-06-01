@@ -81,13 +81,13 @@ class TFTPWriter:
 
 	# Filter on packets to be recieved
 	def sniff_filter(self, pkt):
-		return pkt.haslayer(IP) and pkt[IP].src == self.src and pkt[IP].dst == self.dst and \
+		return pkt.haslayer(IP) and pkt[IP].src == self.dst and pkt[IP].dst == self.src and \
 			pkt.haslayer(UDP) and pkt[UDP].dport == self.sport
 
 	# Send the file block by block
 	def send_data(self):
 		for i in range(1, len(self.data_list)+1):
-			DATA = data_pkt/TFTP(op=03)/TFTP_DATA(block=i)/Raw(load=self.data_list[i-1])
+			DATA = self.basic_pkt/TFTP(op=03)/TFTP_DATA(block=i)/Raw(load=self.data_list[i-1])
 			send(DATA, verbose=self.verbose)
 			# setup a timer 
 			while self.block == i:
