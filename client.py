@@ -223,7 +223,10 @@ if __name__ == '__main__':
 		source_port = args.source_port[0]
 	else:
 		try:
-			source_ip = ni.ifaddresses(args.iface[0])[ni.AF_INET][0]['addr']
+			if not args.ipv6:
+				source_ip = ni.ifaddresses(args.iface[0])[ni.AF_INET][0]['addr']
+			else:
+				source_ip = ni.ifaddresses(args.iface[0])[ni.AF_INET6][0]['addr'].split('%')[0]
 			source_port = random.randint(1024, 65535)
 		except:
 			print 'Invalid interface name', args.iface[0]
@@ -231,6 +234,9 @@ if __name__ == '__main__':
 
 	dest_ip = args.ipaddr[0]
 	dest_port = args.port[0]
+
+	print source_ip
+	print dest_ip
 
 	if args.multiple:
 		n = args.multiple[0]
