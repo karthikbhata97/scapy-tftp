@@ -1,5 +1,8 @@
 # TFTP client using scapy
 
+# Dependencies:
+	* netifaces
+
 usage:
 ```
 sudo python2.7 client.py [-h] [-6] -p PORT -i IPADDR
