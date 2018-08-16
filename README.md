@@ -1,6 +1,13 @@
 # TFTP client using scapy
 
-# Dependencies:
+### Requirements
+* Scapy on Python2.7
+* Update iptables to prevent sending RST
+  ```
+  bash update_iptables.sh
+  ``` 
+
+#### Python Dependencies:
 	* netifaces
 
 usage:
