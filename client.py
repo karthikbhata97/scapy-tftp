@@ -183,7 +183,7 @@ if __name__ == '__main__':
 		while True:
 			sys.stdout.write(">> ")
 			inp = raw_input().split(' ')
-			if inp == 'exit':
+			if inp[0] == 'exit':
 				return
 			if len(inp) == 1:
 				inp.append(None)
