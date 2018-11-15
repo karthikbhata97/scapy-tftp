@@ -89,7 +89,7 @@ class TFTPWriter:
 		for i in range(1, len(self.data_list)+1):
 			DATA = self.basic_pkt/TFTP(op=03)/TFTP_DATA(block=i)/Raw(load=self.data_list[i-1])
 			send(DATA, verbose=self.verbose)
-			# setup a timer 
+			# setup a timer
 			while self.block == i:
 				pass
 
@@ -141,7 +141,7 @@ class TFTPClient:
 			read_thread = Thread(target=read_obj.listen)
 			read_thread.start()
 			send(RRQ, verbose=self.verbose)
-			read_thread.join()						
+			read_thread.join()
 		elif command == 'put':
 			if not os.path.isfile(filename):
 				print "No such file"
@@ -155,7 +155,7 @@ class TFTPClient:
 			if TFTP_ERROR in reply:
 				print reply[TFTP_ERROR].errormsg
 				sys.exit(0)
-			dport = reply[UDP].sport			
+			dport = reply[UDP].sport
 			write_obj = TFTPWriter(self.src, self.dst, self.sport, dport, filename)
 			write_thread = Thread(target=write_obj.listen)
 			write_thread.start()
@@ -196,7 +196,7 @@ if __name__ == '__main__':
 			t.start()
 			threads.append(t)
 		for i in range(n):
-			threads[i].join()	
+			threads[i].join()
 
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-6', '--ipv6', help='Connect to a IPv6 TFTP server', action='store_true')
@@ -205,7 +205,7 @@ if __name__ == '__main__':
 	parser.add_argument('-si', '--source_ip', help='client ip address', nargs=1, type=str, required=False)
 	parser.add_argument('-sp', '--source_port', help='client port', nargs=1, type=int, required=False)
 	parser.add_argument('--iface', help='Interface of which the client should put the packets', nargs=1, type=str, required=False)
-	parser.add_argument('-m', '--multiple', help='Open given number of connections to FTP server', nargs=1, type=int)
+	parser.add_argument('-m', '--multiple', help='Open given number of connections to TFTP server', nargs=1, type=int)
 	args = parser.parse_args()
 
 	if args.ipv6:
