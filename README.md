@@ -40,6 +40,8 @@ Arguments:
 
   -m MULTIPLE, --multiple MULTIPLE
                         Open given number of connections to TFTP server
+                        Commands are entered comma seperated command list in interactive input mode. `exit` to end.
+                        Eg: >>> get one,get two
 ```
 
 Use ```get``` and ```put``` to share  files between client and server.
