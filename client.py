@@ -103,7 +103,8 @@ class TFTPWriter:
             print pkt[TFTP_ERROR].errmsg
             sys.exit(0)
         else:
-            pkt.dump()
+            pass
+            # pkt.dump()
 
     # Sniff packets
     def listen(self):
@@ -148,8 +149,8 @@ class TFTPClient:
                 return
             WRQ = self.basic_pkt/TFTP(op=02)/TFTP_RRQ(filename=filename, mode=self.mode)
             reply = None
-            while not reply:
-                reply = sr1(WRQ, timeout=2, verbose=self.verbose)
+            while not reply or UDP not in reply:
+                reply = sr1(WRQ, timeout=5, verbose=self.verbose)
             reply[UDP].dport = 69
             reply = reply.__class__(str(reply))
             if TFTP_ERROR in reply:
